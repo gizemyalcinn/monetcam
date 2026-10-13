@@ -6,3 +6,7 @@ images/
 data/
 checkpoints/
 samples/
+outputs/
+runs/
+kaggle_code.zip
+.vscode/
