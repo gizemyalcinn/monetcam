@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Açılış anındaki zemin rengi Compose temasıyla aynı (keten), beyaz parlama olmasın -->
+    <style name="Theme.MonetCam" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/linen</item>
+    </style>
+</resources>

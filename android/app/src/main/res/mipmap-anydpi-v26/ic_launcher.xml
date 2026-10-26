@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Simge: Monet nilüferlerini yansıtan eski bir objektif (Higgsfield / Nano Banana Pro ile üretildi) -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_monet_bg" />
+    <foreground android:drawable="@drawable/ic_launcher_monet_fg" />
+    <monochrome android:drawable="@drawable/ic_launcher_monet_fg" />
+</adaptive-icon>
