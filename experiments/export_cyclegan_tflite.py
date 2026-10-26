@@ -1,3 +1,5 @@
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))  # repo kökü
 import torch, numpy as np, litert_torch
 import torch.nn.functional as F
 from torch import nn

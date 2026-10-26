@@ -1,5 +1,7 @@
 """Modeli ~90 küçük parçaya böler (her katmanın kanalları 4 gruba ayrılıyor).
 denendi ama telefonda 20 parçalı sürüm kullanılıyor, bkz. export_cyclegan_segments.py"""
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))  # repo kökü
 import torch, numpy as np, litert_torch
 from torch import nn
 import torch.nn.functional as F

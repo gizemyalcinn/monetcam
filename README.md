@@ -43,7 +43,7 @@ Training (`train_cyclegan.py`) starts from the authors' public `style_monet` wei
 | Loss weights | cycle 5.0, identity 0.5 (paper: 10 and 5, lowered for a bolder transfer) |
 | Schedule | 20k steps on 256×256 crops, G frozen for the first 1.5k steps so the new discriminators can catch up |
 
-Training ran on Kaggle GPUs. Before CycleGAN I tried Johnson-style fast style transfer (`model.py`, `losses.py`, `train.py`) with VGG perceptual and Gram losses. Instance norm there produced recurring blob artifacts, and switching to batch norm traded them for a repetitive texture. Neither looked like a painting, which is why the project moved to CycleGAN plus an explicit painting step.
+Training ran on Kaggle GPUs. Before CycleGAN I tried Johnson-style fast style transfer (`experiments/fast_style_transfer/`) with VGG perceptual and Gram losses. Instance norm there produced recurring blob artifacts, and switching to batch norm traded them for a repetitive texture. Neither looked like a painting, which is why the project moved to CycleGAN plus an explicit painting step.
 
 ### 2. Stroke renderer
 
@@ -101,9 +101,10 @@ Redmi Note 13 Pro 5G (Snapdragon 7s Gen 2, Adreno 710), 896×672:
 | `paint.py` | Reference implementation of the stroke renderer |
 | `export_cyclegan_gpu.py` | GPU-friendly layer rewrites and single-model export |
 | `export_cyclegan_segments.py` | 20-signature export used by the app |
-| `export_cyclegan_chunks.py` | 88-signature variant (channel-split, not used in the app) |
-| `model.py`, `losses.py`, `train.py`, `stylize.py` | Earlier fast style transfer experiments |
+| `checkpoints/cyclegan/G_bold_final.pth` | Fine-tuned generator weights (45 MB) |
 | `android/` | Kotlin + Jetpack Compose app, LiteRT 2.3 |
+| `experiments/fast_style_transfer/` | The earlier fast style transfer attempt (model, losses, training, small tests) |
+| `experiments/` | Older export variants: pixel_shuffle export, 88-signature channel-split export |
 
 ## Getting started
 
@@ -113,11 +114,11 @@ venv\Scripts\activate                     # Windows
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
 pip install -r requirements.txt
 
-python try_cyclegan.py images/photo.jpg   # needs checkpoints/cyclegan/G_bold_final.pth
+python try_cyclegan.py path/to/photo.jpg  # uses checkpoints/cyclegan/G_bold_final.pth
 python export_cyclegan_segments.py        # writes monet_cyclegan_seg_896x672.tflite
 ```
 
-Copy the `.tflite` file to `android/app/src/main/assets/`, open `android/` in Android Studio and run it (minSdk 28). Checkpoints and datasets are not in the repo because of their size.
+The app already ships with the exported model, so to just run it open `android/` in Android Studio and hit Run (minSdk 28). After re-exporting, copy the new `.tflite` into `android/app/src/main/assets/`. Run all scripts from the repo root. The fine-tuned weights are included; the training data (monet2photo) is not.
 
 ## Credits
 
