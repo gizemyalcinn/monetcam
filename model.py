@@ -1,6 +1,21 @@
 import torch
 from torch import nn
 
+
+def make_norm(kind, ch):
+    """Normalizasyon katmanı.
+    "batch":    BatchNorm. İstatistikler eğitim boyunca öğrenilir, kullanımda sabittir.
+                Model tek bir noktayla istatistiği manipüle edemez -> "damla" lekeleri oluşmaz.
+                Telefona dönüştürülürken evrişimin içine katlanır (daha hızlı).
+    "instance": InstanceNorm. Her görüntüyü kendi içinde normalleştirir.
+                Eski modeller (v1, v2) bununla eğitildi."""
+    if kind == "batch":
+        return nn.BatchNorm2d(ch)
+    if kind == "instance":
+        return nn.InstanceNorm2d(ch, affine=True)
+    raise ValueError(f"Bilinmeyen normalizasyon: {kind}")
+
+
 class ConvLayer(nn.Module):
     def __init__(self, in_ch, out_ch, kernel_size, stride):
         super().__init__()
@@ -12,12 +27,12 @@ class ConvLayer(nn.Module):
 
 
 class ResidualBlock(nn.Module):
-    def __init__(self, ch):
+    def __init__(self, ch, norm):
         super().__init__()
         self.conv1 = ConvLayer(ch, ch, 3, 1)
-        self.in1 = nn.InstanceNorm2d(ch, affine=True)
+        self.in1 = make_norm(norm, ch)
         self.conv2 = ConvLayer(ch, ch, 3, 1)
-        self.in2 = nn.InstanceNorm2d(ch, affine=True)
+        self.in2 = make_norm(norm, ch)
         self.relu = nn.ReLU()
 
     def forward(self, x):
@@ -37,19 +52,30 @@ class UpsampleConv(nn.Module):
 
 
 class TransformerNet(nn.Module):
-    def __init__(self):
+    def __init__(self, norm="batch"):
         super().__init__()
+        self.norm = norm
         self.encoder = nn.Sequential(
-            ConvLayer(3, 32, 9, 1),   nn.InstanceNorm2d(32, affine=True),  nn.ReLU(),
-            ConvLayer(32, 64, 3, 2),  nn.InstanceNorm2d(64, affine=True),  nn.ReLU(),
-            ConvLayer(64, 128, 3, 2), nn.InstanceNorm2d(128, affine=True), nn.ReLU(),
+            ConvLayer(3, 32, 9, 1),   make_norm(norm, 32),  nn.ReLU(),
+            ConvLayer(32, 64, 3, 2),  make_norm(norm, 64),  nn.ReLU(),
+            ConvLayer(64, 128, 3, 2), make_norm(norm, 128), nn.ReLU(),
         )
-        self.residuals = nn.Sequential(*[ResidualBlock(128) for _ in range(5)])
+        self.residuals = nn.Sequential(*[ResidualBlock(128, norm) for _ in range(5)])
         self.decoder = nn.Sequential(
-            UpsampleConv(128, 64, 3), nn.InstanceNorm2d(64, affine=True), nn.ReLU(),
-            UpsampleConv(64, 32, 3),  nn.InstanceNorm2d(32, affine=True), nn.ReLU(),
+            UpsampleConv(128, 64, 3), make_norm(norm, 64), nn.ReLU(),
+            UpsampleConv(64, 32, 3),  make_norm(norm, 32), nn.ReLU(),
             ConvLayer(32, 3, 9, 1),
         )
 
     def forward(self, x):
         return self.decoder(self.residuals(self.encoder(x)))
+
+
+def load_transformer(path, device="cpu"):
+    """Checkpoint'i yükler. BatchNorm mu InstanceNorm mu olduğunu dosyadan kendisi anlar:
+    BatchNorm modellerinde 'running_mean' kayıtları bulunur."""
+    state = torch.load(path, map_location=device)
+    norm = "batch" if any(k.endswith("running_mean") for k in state) else "instance"
+    model = TransformerNet(norm=norm).to(device)
+    model.load_state_dict(state)
+    return model.eval()

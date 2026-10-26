@@ -3,7 +3,7 @@ from pathlib import Path
 
 import torch
 from utils import device, load_image, save_image
-from model import TransformerNet
+from model import load_transformer
 
 
 def main():
@@ -16,9 +16,7 @@ def main():
                         help="uzun kenarın piksel boyutu")
     args = parser.parse_args()
 
-    model = TransformerNet().to(device)
-    model.load_state_dict(torch.load(args.checkpoint, map_location=device))
-    model.eval()
+    model = load_transformer(args.checkpoint, device)
 
     x = load_image(args.input, max_size=args.size)
     _, _, H, W = x.shape

@@ -57,7 +57,7 @@ DATA_DIRS = find_data_dirs()
 MAX_IMAGES = 60000   # Kaggle'da train2017 de bulunursa ~120 bin fotoğraf olur; bu kadarı yeterli
 NUM_WORKERS = 4 if ON_KAGGLE else 2
 
-RUN_NAME = "bridge_512_relu22_sw4e10_tv"
+RUN_NAME = "bridge_512_bn_sw4e10_tv"
 STYLE_IMAGE = "images/bridge.jpg"
 TEST_IMAGE = "images/pelicans.jpeg"
 INIT_WEIGHTS = None
@@ -117,7 +117,7 @@ def main():
         raise SystemExit("Hiç fotoğraf bulunamadı: COCO veri setinin eklendiğinden emin ol.")
 
     vgg = load_vgg(device)
-    model = TransformerNet().to(device)
+    model = TransformerNet(norm="batch").to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=LR)
     scaler = torch.amp.GradScaler("cuda", enabled=USE_AMP)
 

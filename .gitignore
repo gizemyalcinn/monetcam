@@ -10,3 +10,5 @@ outputs/
 runs/
 kaggle_code.zip
 .vscode/
+_to_delete/
+cyclegan_code.zip
