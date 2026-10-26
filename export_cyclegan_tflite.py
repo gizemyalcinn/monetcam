@@ -4,10 +4,7 @@ from torch import nn
 from cyclegan import load_cyclegan
 
 class ConvTransposeAsConv(nn.Module):
-    """ConvTranspose2d(k=3, stride=2, padding=1, output_padding=1) ile birebir aynı sonuç.
-    Çıktının her 2x2 bloğundaki 4 pikselin her biri, girdinin 2x2 komşuluğundan normal bir
-    evrişimle hesaplanır (4 alt-çekirdek); sonra pixel_shuffle bunları yerine dizer.
-    Dönüştürücü bu işlemleri destekliyor ve dosyaya büyük sabitler gömülmüyor."""
+    """ConvTranspose2d ile aynı sonuç: 4 alt çekirdekli conv + pixel_shuffle."""
     def __init__(self, ct):
         super().__init__()
         W = ct.weight.detach()            # (in, out, 3, 3)

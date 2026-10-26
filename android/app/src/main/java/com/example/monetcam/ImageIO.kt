@@ -16,13 +16,13 @@ private fun authority(context: Context) = "${context.packageName}.fileprovider"
 private fun imagesDir(context: Context): File =
     File(context.cacheDir, "images").apply { mkdirs() }
 
-/** Kameranın çektiği fotoğrafı yazacağı geçici dosya için bir adres üretir. */
+// kameranın fotoğrafı yazacağı geçici dosya
 fun newCameraUri(context: Context): Uri {
     val file = File(imagesDir(context), "camera_${System.currentTimeMillis()}.jpg")
     return FileProvider.getUriForFile(context, authority(context), file)
 }
 
-/** Sonucu telefonun galerisine, Pictures/MonetCam klasörüne kaydeder. */
+// galeriye kaydet (Pictures/MonetCam)
 fun saveToGallery(context: Context, bitmap: Bitmap): Boolean {
     val name = "Monet_${System.currentTimeMillis()}.jpg"
     val values = ContentValues().apply {
@@ -44,7 +44,7 @@ fun saveToGallery(context: Context, bitmap: Bitmap): Boolean {
     return ok
 }
 
-/** Sonucu geçici bir dosyaya yazıp Android'in paylaşım menüsünü açar. */
+// geçici dosyaya yazıp paylaşım menüsünü açar
 fun shareImage(context: Context, bitmap: Bitmap) {
     val file = File(imagesDir(context), "monet_share.jpg")
     file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 95, it) }

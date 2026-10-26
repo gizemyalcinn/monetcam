@@ -5,8 +5,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-// Dinamik renk bilerek KAPALI: açık olsaydı uygulama renklerini telefonun
-// duvar kağıdından alırdı ve Monet paleti kaybolurdu.
+// dinamik renk kapalı, yoksa renkler duvar kağıdından gelir
 private val MonetColors = lightColorScheme(
     primary = PondBlue,
     onPrimary = Color.White,

@@ -8,10 +8,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.example.monetcam.R
 
-// Yazı tipleri (lisansları: assets/licenses/)
-val LogoFont = FontFamily(Font(R.font.abril_fatface))         // "Monet": kalın, tablo dokusuyla dolacak
-val TypewriterFont = FontFamily(Font(R.font.special_elite))   // "Cam": eski daktilo / fotoğraf makinesi etiketi
-val SerifItalic = FontFamily(Font(R.font.cormorant_italic))   // alt başlık ve etiketler
+// yazı tipi lisansları assets/licenses içinde
+val LogoFont = FontFamily(Font(R.font.abril_fatface))         // logo
+val TypewriterFont = FontFamily(Font(R.font.special_elite))
+val SerifItalic = FontFamily(Font(R.font.cormorant_italic))
 
 val Typography = Typography(
     displaySmall = TextStyle(fontFamily = LogoFont, fontSize = 52.sp, lineHeight = 56.sp),

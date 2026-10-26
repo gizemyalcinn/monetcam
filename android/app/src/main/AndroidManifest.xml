@@ -2,7 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Android 9'da galeriye kaydetmek için gerekli; 10+ sürümlerde izin istenmez -->
+    <!-- sadece android 9 için -->
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
@@ -17,7 +17,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.MonetCam">
 
-        <!-- GPU (OpenCL) sürücüsü üretici kütüphanesi; Android 12+ uygulamaların bunu açıkça istemesi gerekiyor -->
+        <!-- GPU (OpenCL) için -->
         <uses-native-library android:name="libOpenCL.so" android:required="false" />
         <uses-native-library android:name="libvndksupport.so" android:required="false" />
 

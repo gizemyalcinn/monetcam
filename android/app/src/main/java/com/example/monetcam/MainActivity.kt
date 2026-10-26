@@ -87,17 +87,13 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/**
- * Uygulamanın kökü: önce karşılama ekranı, sürgü kaydırılınca işleme ekranı (yandan kayarak gelir).
- * Geri tuşu işleme ekranından karşılamaya döndürür.
- */
+// önce karşılama ekranı, kaydırınca ana ekran. geri tuşu karşılamaya döner
 @OptIn(ExperimentalCoroutinesApi::class)
 @Composable
 fun MonetRoot() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    // Model GPU için ilk açılışta ~14 sn hazırlanıyor (derleme + doğruluk testi). Bunu karşılama ekranı
-    // açılır açılmaz arka planda başlatıyoruz: kullanıcı içeri girdiğinde büyük ihtimalle hazır olur.
+    // model hazırlığı ~14 sn sürüyor, karşılama ekranındayken arka planda başlasın
     val stylizerJob = remember {
         scope.async(Dispatchers.Default) { MonetStylizer(context.applicationContext) }
     }
@@ -112,7 +108,7 @@ fun MonetRoot() {
     AnimatedContent(
         targetState = started,
         transitionSpec = {
-            // içeri: karşılama yukarı kayıp gider, işleme ekranı aşağıdan gelir; geri: tersi
+            // içeri girerken yukarı kayar, geri dönerken aşağı
             if (targetState) {
                 (slideInVertically(tween(450)) { it } + fadeIn(tween(400))) togetherWith
                     (slideOutVertically(tween(450)) { -it / 2 } + fadeOut(tween(300)))
@@ -143,20 +139,19 @@ fun MonetApp(stylizerJob: Deferred<MonetStylizer>) {
 
     fun process(uri: Uri) {
         scope.launch {
-            // Yeni fotoğraf işlenirken eskisi arkada görünmesin: önce kartı boşalt
+            // eski sonuç arkada görünmesin
             original = null
             painted = null
             phase = 0
             busy = true
-            // Yükleme ekranının ilk karelerinin çizilmesine fırsat ver; ağır iş (fotoğrafı açma, GPU)
-            // hemen başlarsa ekran ilk anda takılmış gibi görünüyor
+            // yükleme ekranı önce çizilsin
             delay(350)
             try {
                 val stylizer = stylizerJob.await()
                 val (pair, ms) = withContext(Dispatchers.Default) {
                     val photo = loadBitmap(context, uri)
                     val t0 = SystemClock.elapsedRealtime()
-                    // ilerleme arka planda geliyor; ekran durumunu ana iş parçacığında güncelle
+                    // ilerleme arka plandan geliyor, ana thread'de güncelle
                     val out = stylizer.stylize(photo) { _, ph ->
                         mainHandler.post { phase = ph }
                     }
@@ -164,7 +159,7 @@ fun MonetApp(stylizerJob: Deferred<MonetStylizer>) {
                 }
                 original = pair.first
                 painted = pair.second
-                // süre ve GPU/CPU bilgisi sadece geliştirici için Logcat'e yazılıyor, ekranda gösterilmiyor
+                // süre sadece logcat'e
                 android.util.Log.d("MonetCam", "stylize: %.1f sn · %s".format(ms / 1000f, stylizer.accelerator))
             } catch (e: Exception) {
                 snackbar.showSnackbar("Bir şeyler ters gitti: ${e.message}")
@@ -182,7 +177,7 @@ fun MonetApp(stylizerJob: Deferred<MonetStylizer>) {
     ) { success -> cameraUri?.let { if (success) process(it) } }
 
     Box(Modifier.fillMaxSize().background(Linen)) {
-    // Arka plan: Monet'nin Nilüfer Göleti detayı, bulanıklaştırılmış; üst kısım okunurluk için açık
+    // arka plan
     Image(
         painterResource(R.drawable.monet_bg),
         contentDescription = null,
@@ -264,21 +259,20 @@ fun Header() {
     }
 }
 
-/** "MonetCam" yazısı: her harfin içi farklı bir Monet tablosuyla dolu, koyu mürekkep konturlu. */
+// "MonetCam" logosu, her harfin içinde farklı bir Monet tablosu
 @OptIn(ExperimentalTextApi::class)
 @Composable
 fun MonetWordmark() {
-    // her harfin içinde ayrı bir Monet tablosu:
-    // M = Izlenim, Gundogumu · o = Nilüferler · n = Gelincikler · e = Şemsiyeli Kadın · t = Parlamento, Gün Batımı
+    // M İzlenim, o Nilüferler, n Gelincikler, e Şemsiyeli Kadın, t Parlamento
     val letters = listOf(
         'M' to R.drawable.monet_letter_1,
         'o' to R.drawable.monet_letter_2,
         'n' to R.drawable.monet_letter_3,
         'e' to R.drawable.monet_letter_4,
         't' to R.drawable.monet_letter_5,
-        'C' to R.drawable.monet_letter_6,   // İzlenim, Gündoğumu (gökyüzü ve kayıklar)
-        'a' to R.drawable.monet_letter_7,   // Nilüferler (üst kısım)
-        'm' to R.drawable.monet_letter_8,   // Parlamento, Gün Batımı (su ve kuleler)
+        'C' to R.drawable.monet_letter_6,
+        'a' to R.drawable.monet_letter_7,
+        'm' to R.drawable.monet_letter_8,
     )
     val base = TextStyle(fontFamily = LogoFont, fontSize = 40.sp, lineHeight = 44.sp)
     Row {
@@ -286,7 +280,7 @@ fun MonetWordmark() {
             val img = ImageBitmap.imageResource(res)
             val brush = remember(img) { CoverImageBrush(img) }
             Box {
-                // önce kalın kontur (tablonun çerçevesi gibi), üstüne tablo dokulu dolgu
+                // önce kontur, üstüne dolgu
                 Text(ch.toString(), style = base.copy(color = PondBlueDark, drawStyle = Stroke(width = 7f, join = StrokeJoin.Round)))
                 Text(ch.toString(), style = base.copy(brush = brush))
             }
@@ -294,7 +288,7 @@ fun MonetWordmark() {
     }
 }
 
-/** Resmi, harfin kutusunu tamamen kaplayacak şekilde ölçekleyip ortalar (ContentScale.Crop gibi). */
+// resmi harfin kutusunu kaplayacak şekilde ölçekler (Crop gibi)
 class CoverImageBrush(private val img: ImageBitmap) : ShaderBrush() {
     override fun createShader(size: Size): Shader {
         val shader = ImageShader(img, TileMode.Clamp, TileMode.Clamp)
@@ -308,7 +302,7 @@ class CoverImageBrush(private val img: ImageBitmap) : ShaderBrush() {
     }
 }
 
-/** Tablo çerçevesi: paspartulu kart. İçinde boş durum, önce/sonra ya da yükleniyor görünümü. */
+// resim kartı: boş tuval, önce/sonra ya da yükleniyor
 @Composable
 fun ArtFrame(original: Bitmap?, painted: Bitmap?, busy: Boolean, phase: Int) {
     val ratio = painted?.let { it.width.toFloat() / it.height } ?: (3f / 4f)
@@ -335,9 +329,7 @@ fun ArtFrame(original: Bitmap?, painted: Bitmap?, busy: Boolean, phase: Int) {
                     .background(CanvasWhite),
                 contentAlignment = Alignment.Center
             ) {
-                // Sadece yazı: işlemin gerçek aşamasını gösterir, aşama değişince yumuşakça geçer.
-                // (Sürekli hareket eden bir gösterge koymuyoruz: model GPU'da çalışırken ekran o saniyelerde
-                // yeni kare çizemiyor, hareketli bir şey takılmış gibi görünüyordu.)
+                // sadece yazı. dönen halka GPU meşgulken takılıyordu
                 Crossfade(
                     targetState = phase.coerceIn(0, loadingLines.lastIndex),
                     animationSpec = tween(400),
@@ -363,14 +355,14 @@ fun EmptyCanvas(showText: Boolean = true) {
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        // Boş tuval: kenarlarında nilüfer fırça izleri olan, ortası açık bir eskiz (Higgsfield ile üretildi)
+        // boş tuval görseli (higgsfield)
         Image(
             painterResource(R.drawable.empty_canvas),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
         )
-        // Yükleniyor yazısı görünürken bu metinler gizlenir: ekranda aynı anda tek yazı olsun
+        // yükleniyorken gizle, ekranda tek yazı olsun
         AnimatedVisibility(visible = showText, enter = fadeIn(), exit = fadeOut()) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -400,7 +392,7 @@ fun EmptyCanvas(showText: Boolean = true) {
     }
 }
 
-/** Önce/sonra karşılaştırması: parmakla sürüklenen çizginin solu orijinal, sağı tablo. */
+// önce/sonra: çizginin solu orijinal, sağı tablo
 @Composable
 fun BeforeAfter(original: Bitmap, painted: Bitmap) {
     var fraction by remember(painted) { mutableFloatStateOf(0.5f) }
@@ -431,13 +423,11 @@ fun BeforeAfter(original: Bitmap, painted: Bitmap) {
                 }
         )
 
-        // Ayırıcı çizgi
         Canvas(Modifier.fillMaxSize()) {
             val x = size.width * fraction
             drawLine(Color.White, Offset(x, 0f), Offset(x, size.height), strokeWidth = 3.dp.toPx())
         }
 
-        // Tutamak
         BoxWithConstraints(Modifier.fillMaxSize()) {
             Box(
                 modifier = Modifier
@@ -468,7 +458,6 @@ fun LabelChip(text: String, modifier: Modifier = Modifier) {
     )
 }
 
-/** Müze etiketi havasında küçük bir bilgi satırı. */
 @Composable
 fun ActionBar(
     busy: Boolean,
@@ -498,7 +487,6 @@ fun ActionBar(
             ) {
                 Icon(painterResource(R.drawable.ic_gallery), contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(8.dp))
-                // düz (italik olmayan), sade yazı
                 Text(
                     "Galeriden seç",
                     style = MaterialTheme.typography.labelLarge.copy(
@@ -531,12 +519,12 @@ fun RoundAction(icon: Int, label: String, enabled: Boolean, onClick: () -> Unit,
     }
 }
 
-/** Yükleme ekranındaki yazılar; işlemin gerçek aşamasına göre (MonetStylizer.stylize -> phase) seçilir. */
+// yükleme yazıları, phase değerine göre
 private val loadingLines = listOf(
-    "Fotoğraf inceleniyor…",                   // 0: fotoğraf açılıyor
-    "Monet'nin renk paleti uygulanıyor…",      // 1: model
-    "Geniş fırçayla ilk katman atılıyor…",     // 2: kalın fırça
-    "Orta fırçayla şekiller belirginleşiyor…", // 3: orta fırça
-    "İnce fırçayla detaylar işleniyor…",       // 4: ince fırça
-    "Tablo son haline geliyor…",               // 5: bitiyor
+    "Fotoğraf inceleniyor…",
+    "Monet'nin renk paleti uygulanıyor…",
+    "Geniş fırçayla ilk katman atılıyor…",
+    "Orta fırçayla şekiller belirginleşiyor…",
+    "İnce fırçayla detaylar işleniyor…",
+    "Tablo son haline geliyor…",
 )

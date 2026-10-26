@@ -1,21 +1,5 @@
-"""CycleGAN'ı GPU'da ekranı takılmadan çalıştırmak için ~90 küçük parçaya bölerek TFLite'a çevirir.
-
-Neden: GPU bir işlemi bitirmeden ekranı çizemiyor. Model tek parçayken ekran 6 sn donuyordu,
-20 parçaya bölününce her parça ~0,3 sn sürüyordu (halka kesik kesik). Burada her katmanın çıkış
-kanalları 4 gruba bölünüyor: InstanceNorm her kanalı kendi başına normalize ettiği için her grup
-bağımsız hesaplanabiliyor ve sonuç birebir aynı kalıyor. Her parça ~0,05-0,07 sn sürüyor.
-
-Tensörler K=4 parça hâlinde taşınır (her biri NHWC, kanalların dörtte biri). Parçalar (imzalar):
-  e1            : resim                    -> a1 (896x672x64)
-  e2_j  (j<2)   : a1                       -> a2'nin j. yarısı (448x336x64)
-  e3_k  (k<4)   : a2_0, a2_1               -> h_k (224x168x64)
-  r{i}a_k       : h_0..h_3                 -> y_k
-  r{i}b_k       : y_0..y_3, h_k            -> yeni h_k
-  d1_k          : h_0..h_3                 -> u_k (448x336x32)
-  d2_k          : u_0..u_3                 -> v_k (896x672x16)
-  fin           : v_0..v_3                 -> resim (0..1)
-Katman değişiklikleri (GPU uyumu) export_cyclegan_gpu.py'deki ile aynı.
-"""
+"""Modeli ~90 küçük parçaya böler (her katmanın kanalları 4 gruba ayrılıyor).
+denendi ama telefonda 20 parçalı sürüm kullanılıyor, bkz. export_cyclegan_segments.py"""
 import torch, numpy as np, litert_torch
 from torch import nn
 import torch.nn.functional as F
@@ -31,14 +15,14 @@ L = list(m.g.model)
 
 
 def conv_part(conv, sl):
-    """Bir Conv2d'nin sadece sl aralığındaki çıkış kanallarını hesaplayan kopyası."""
+    """conv'un sadece sl kanallarını hesaplayan kopyası"""
     c = nn.Conv2d(conv.in_channels, sl.stop - sl.start, conv.kernel_size, conv.stride, conv.padding)
     c.weight.data = conv.weight.data[sl].clone(); c.bias.data = conv.bias.data[sl].clone()
     return c
 
 
 def ct_part(ct, sl):
-    """ConvTransposeAsConv'un sadece sl aralığındaki çıkış kanallarını hesaplayan kopyası."""
+    """ConvTransposeAsConv için aynısı"""
     C = ct.cout
     w = ct.weight.data.reshape(4, C, *ct.weight.shape[1:])[:, sl].reshape(-1, *ct.weight.shape[1:])
     b = ct.bias.data.reshape(4, C)[:, sl].reshape(-1)
@@ -54,7 +38,7 @@ def chunks(n, k):
 
 
 class Cat(nn.Module):
-    """Birden çok parçayı kanal boyunca birleştirip bir alt modüle verir."""
+    """parçaları kanal boyunca birleştirip body'ye verir"""
     def __init__(s, body, scale_in=False):
         super().__init__(); s.body = body; s.scale_in = scale_in
     def forward(s, *xs):
@@ -122,8 +106,7 @@ if __name__ == "__main__":
         ref = full(x).clamp(0, 1)
     print("PyTorch parçalı fark:", float((run_torch(x)["fin"] - ref).abs().max()), flush=True)
 
-    # örnek girdiler: her biri ayrı tensör (aynı tensörü iki kez vermek girdileri birleştiriyor)
-    # tensör boyutlarını küçük bir girdiyle bul, tam boyuta ölçekle (bellek tasarrufu)
+    # boyutları küçük girdiyle bulup ölçekliyoruz, tam boyutta bellek yetmiyor
     small = run_torch(torch.rand(1, 3, 128, 96))
     def full_shape(n):
         b, c, h, w = small[n].shape
@@ -136,7 +119,7 @@ if __name__ == "__main__":
     em = conv.convert()
     em.export("monet_cyclegan_chunk_896x672.tflite")
 
-    # Doğrulama: parçalar sırayla TFLite'ta
+    # kontrol
     x = torch.rand(1, 3, H, W)
     with torch.no_grad():
         ref = full(x).clamp(0, 1).permute(0, 2, 3, 1).numpy()
@@ -147,9 +130,9 @@ if __name__ == "__main__":
     for idx, (name, (mod, ins)) in enumerate(parts.items()):
         tt[name] = em(*[tt[n] for n in ins], signature_name=name)
         for n in ins:
-            if last_use[n] == idx: del tt[n]     # artık gerekmeyen ara sonuçları bırak
+            if last_use[n] == idx: del tt[n]     # belleği boşalt
     print("parçalı tflite farkı:", float(np.abs(tt["fin"] - ref).max()))
-    # Kotlin için plan: imza ve girdileri
+    # kotlin tarafı için plan
     with open("plan.txt", "w") as f:
         for name, (mod, ins) in parts.items():
             f.write(name + ":" + ",".join(ins) + "\n")

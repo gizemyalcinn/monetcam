@@ -36,14 +36,10 @@ import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.sin
 
-/**
- * Karşılama ekranı: sade, açık renkli; ortada simge, MonetCam yazısı, slogan ve kısa tanıtım.
- * Ekranın herhangi bir yerinden parmakla yukarı kaydırınca [onStart] çağrılır (işleme ekranına geçiş).
- * Kaydırırken içerik parmağı takip edip yukarı kayar ve solar; yeterince kaydırılmazsa yerine döner.
- */
+// karşılama ekranı, yukarı kaydırınca onStart çağrılır
 @Composable
 fun WelcomeScreen(onStart: () -> Unit) {
-    val drag = remember { Animatable(0f) }      // 0 = yerinde, eksi = yukarı kaydırılmış (piksel)
+    val drag = remember { Animatable(0f) }      // eksi değer = yukarı kaydırılmış
     val scope = rememberCoroutineScope()
     var heightPx by remember { mutableFloatStateOf(1f) }
     var leaving by remember { mutableStateOf(false) }
@@ -58,7 +54,7 @@ fun WelcomeScreen(onStart: () -> Unit) {
                 detectVerticalDragGestures(
                     onDragEnd = {
                         scope.launch {
-                            // ekranın %18'inden fazla yukarı kaydırıldıysa içeri gir
+                            // ekranın %18'inden fazlası kaydırıldıysa geç
                             if (-drag.value > heightPx * 0.18f && !leaving) {
                                 leaving = true
                                 onStart()
@@ -70,12 +66,12 @@ fun WelcomeScreen(onStart: () -> Unit) {
                     onDragCancel = { scope.launch { drag.animateTo(0f, spring()) } }
                 ) { change, dy ->
                     change.consume()
-                    // sadece yukarı; aşağı çekince yerinde kalır
+                    // sadece yukarı
                     scope.launch { drag.snapTo((drag.value + dy).coerceIn(-heightPx, 0f)) }
                 }
             }
     ) {
-        // Arka plan: Higgsfield'da üretilen açık pastel nilüfer tablosu, üzerinde krem perde (göz yormasın)
+        // arka plan + üstüne açık krem katman
         Image(
             painterResource(R.drawable.monet_bg),
             contentDescription = null,
@@ -84,7 +80,7 @@ fun WelcomeScreen(onStart: () -> Unit) {
         )
         Box(Modifier.fillMaxSize().background(Linen.copy(alpha = 0.62f)))
 
-        // İçerik: parmakla birlikte yukarı kayar ve solar
+        // içerik parmakla birlikte kayıp soluyor
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
@@ -97,7 +93,7 @@ fun WelcomeScreen(onStart: () -> Unit) {
                 }
         ) {
             Spacer(Modifier.weight(1f))
-            // Simge: ince çerçeveli daire içinde objektif
+            // simge
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
@@ -121,7 +117,6 @@ fun WelcomeScreen(onStart: () -> Unit) {
                 color = PondBlueDark
             )
             Spacer(Modifier.height(20.dp))
-            // ince ayırıcı çizgi
             Box(Modifier.width(36.dp).height(1.dp).background(PondBlue.copy(alpha = 0.25f)))
             Spacer(Modifier.height(20.dp))
             Text(
@@ -137,7 +132,7 @@ fun WelcomeScreen(onStart: () -> Unit) {
     }
 }
 
-/** Yukarı kaydırma ipucu: aşağıdan yukarı doğru dalga gibi yanıp sönen üç ok ve kısa bir yazı. */
+// yukarı kaydırma ipucu: aşağıdan yukarı yanıp sönen üç ok
 @Composable
 fun SwipeUpHint() {
     val t = rememberInfiniteTransition(label = "ipucu")
@@ -152,7 +147,7 @@ fun SwipeUpHint() {
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.graphicsLayer { translationY = -lift * sin(2 * PI * phase).toFloat() }
         ) {
-            // üstteki ok (i=2) dalgayı en son alır: ışık aşağıdan yukarı akıyormuş gibi
+            // üstteki ok dalgayı en son alıyor
             for (i in 2 downTo 0) {
                 val a = 0.15f + 0.85f * (0.5f + 0.5f * sin(2 * PI * (phase - i * 0.18f)).toFloat())
                 Icon(

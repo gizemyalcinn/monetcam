@@ -1,14 +1,6 @@
-"""CycleGAN'ı telefonun GPU'sunda çalışabilecek şekilde TFLite'a çevirir.
-
-Eski dışa aktarımda (export_cyclegan_tflite.py) iki şey GPU'da derlenmiyordu:
-  1) ReflectionPad2d, dosyada GATHER_ND + tamsayı indeks hesaplarına dönüşüyordu -> GPU desteklemiyor.
-  2) Girdi/çıktı NCHW olduğu için modelin her yerine ~110 TRANSPOSE ekleniyordu.
-Burada:
-  - Yansıtmalı dolgu, dilimleme + birleştirme (SLICE + CONCATENATION) ile birebir aynı şekilde yapılıyor.
-  - InstanceNorm, GPU'nun bildiği MEAN/MUL/RSQRT işlemleriyle açıkça yazılıyor.
-  - Girdi ve çıktı kanal-sonda (NHWC: 1x896x672x3) oluyor; Android tarafı da böyle yazıp okuyor.
-  - ConvTranspose2d yine pad + conv + pixel_shuffle ile (export_cyclegan_tflite.py'deki gibi).
-"""
+"""CycleGAN'ı telefon GPU'sunda çalışacak şekilde tflite'a çevirir.
+reflection pad, instance norm ve conv transpose GPU'nun desteklediği işlemlerle yeniden yazıldı.
+girdi/çıktı NHWC."""
 import torch, numpy as np, litert_torch
 import torch.nn.functional as F
 from torch import nn
@@ -16,7 +8,7 @@ from cyclegan import load_cyclegan
 
 
 class ReflectPad(nn.Module):
-    """nn.ReflectionPad2d(p) ile birebir aynı; sadece dilim + birleştirme kullanır."""
+    """ReflectionPad2d ile aynı, sadece slice + concat."""
     def __init__(self, p):
         super().__init__(); self.p = p
     def forward(self, x):
@@ -32,14 +24,7 @@ class ReflectPad(nn.Module):
 
 
 class InstanceNorm(nn.Module):
-    """nn.InstanceNorm2d(affine=False) ile aynı, ama GPU'nun yarım hassasiyetinde (fp16) taşmayan sürüm.
-
-    fp16 en fazla 65504'ü tutabiliyor. Bu ağda InstanceNorm'a giren değerler 30.000'e çıkıyor ve
-    varyans için kareleri alınınca taşıyor -> resim siyah/bozuk çıkıyordu. Burada:
-      - Ortalama iki adımda alınıyor (önce satır boyunca /W, sonra sütun boyunca /H): ara toplamlar küçük kalır.
-      - Her kanal kendi en büyük mutlak değerine (s) bölünüyor: d/s her zaman -1..1 arasında,
-        karesi de 0..1 arasında; asla taşmaz.
-      - Sonuç: d/s * rsqrt(var(d/s) + eps/s²) = d * rsqrt(var(d) + eps)  -> matematiksel olarak birebir aynı."""
+    """InstanceNorm2d (affine yok). fp16'da taşmasın diye kanalı önce max değerine bölüyor."""
     def __init__(self, eps=1e-5):
         super().__init__(); self.eps = eps
     def forward(self, x):
@@ -56,11 +41,7 @@ class InstanceNorm(nn.Module):
 
 
 class ConvTransposeAsConv(nn.Module):
-    """ConvTranspose2d(k=3, s=2, p=1, op=1) ile birebir aynı.
-    Çıktının her 2x2 bloğundaki 4 piksel (a=satır, b=sütun), girdinin 2x2 komşuluğundan
-    normal bir evrişimle hesaplanır (4 alt-çekirdek). Sonra bu 4 parça yerlerine dizilir.
-    pixel_shuffle 6 boyutlu RESHAPE/TRANSPOSE'a dönüşüp GPU'da derlenmediği için dizme işi
-    kanal-sonda (NHWC) sadece 4 boyutlu dilim + birleştirme + reshape ile yapılıyor."""
+    """ConvTranspose2d(k3, s2, p1, op1) ile aynı. 4 alt çekirdekli conv, sonra parçalar yerine dizilir."""
     def __init__(self, ct):
         super().__init__()
         W = ct.weight.detach()            # (in, out, 3, 3)
@@ -81,19 +62,16 @@ class ConvTransposeAsConv(nn.Module):
         N, _, H, W = y.shape
         t = y.permute(0, 2, 3, 1)                                      # N, H, W, [a][b][c]
         rows = [t[..., a * 2 * C:(a + 1) * 2 * C].reshape(N, H, 2 * W, C) for a in (0, 1)]
-        out = torch.cat(rows, dim=2).reshape(N, 2 * H, 2 * W, C)         # satırlar araya girer
+        out = torch.cat(rows, dim=2).reshape(N, 2 * H, 2 * W, C)         
         return out.permute(0, 3, 1, 2)
 
 
-CONV_SCALE = 1.0 / 16   # InstanceNorm'dan önceki evrişimlerin çıktısı bu kadar küçültülür (fp16 taşmasın)
+CONV_SCALE = 1.0 / 16   # norm öncesi convlar küçültülüyor, fp16 taşmasın
 
 
 def gpu_friendly(module):
-    """Modeldeki GPU'da sorun çıkaran katmanları eşdeğerleriyle değiştirir (yerinde).
-
-    Ayrıca InstanceNorm'dan hemen önce gelen her evrişimin ağırlık ve bias'ını CONV_SCALE ile çarpar.
-    InstanceNorm ölçekten bağımsız olduğu için (IN(c*y) = IN(y), eps de c² ile ölçeklenince birebir)
-    sonuç değişmez; ama evrişim çıktıları ~30.000 yerine ~2.000 olur ve fp16'da rahatça sığar."""
+    """GPU'da sorun çıkaran katmanları eşdeğerleriyle değiştirir.
+    norm öncesi convlar CONV_SCALE ile çarpılıyor, IN ölçekten bağımsız olduğu için sonuç değişmiyor."""
     children = list(module.named_children())
     for i, (name, child) in enumerate(children):
         if isinstance(child, nn.ReflectionPad2d):

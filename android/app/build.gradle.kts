@@ -42,7 +42,7 @@ android {
 
 dependencies {
     implementation("com.google.ai.edge.litert:litert:2.3.0")
-    // GPU hızlandırıcısı ayrı pakette geliyor (libLiteRtClGlAccelerator.so); bu olmadan GPU açılamıyor, CPU'ya düşüyor
+    // GPU desteği ayrı pakette
     implementation("com.google.ai.edge.litert:litert-gpu:2.3.0")
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)

@@ -1,6 +1,5 @@
-"""Fırça darbeli boyama (Hertzmann 1998, "Painterly Rendering with Curved Brush Strokes").
-Referans görüntüyü (ör. CycleGAN'ın Monet renkli çıktısı) büyük fırçadan küçüğe katman katman,
-gerçek fırça darbeleriyle yeniden boyar. Darbeler görüntüdeki kenarlara dik yönde kıvrılır."""
+"""Fırça darbeli boyama (Hertzmann 1998). Görüntüyü kalından inceye katman katman
+kenarlar boyunca kıvrılan darbelerle yeniden boyar."""
 import numpy as np, random, sys
 from PIL import Image, ImageDraw, ImageFilter
 
@@ -41,7 +40,7 @@ def paint(ref, radii=(12,6,3), T=18, max_len=10, min_len=2, fc=0.7, seed=0):
                 x+=R*dx; y+=R*dy; ldx,ldy=dx,dy
                 if not(0<=x<W and 0<=y<H): break
                 pts.append((x,y))
-            # hafif renk oynaması: elle boyanmış hissi
+            # küçük renk oynaması
             j=np.random.randint(-8,9,3)
             c=tuple(int(np.clip(col[k]+j[k],0,255)) for k in range(3))
             if len(pts)>1: draw.line(pts,fill=c,width=R*2,joint="curve")

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Uygulama simgesinin arka planı: Higgsfield'da üretilen simge görselinin krem rengi -->
+    <!-- simge arka planı -->
     <color name="ic_launcher_monet_bg">#F6F3E4</color>
 </resources>
