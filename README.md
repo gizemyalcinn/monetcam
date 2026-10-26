@@ -1,30 +1,35 @@
 # MonetCam
 
-Telefonla çektiğin ya da galeriden seçtiğin fotoğrafı Claude Monet tablosuna çeviren bir Android uygulaması. Her şey telefonun içinde çalışıyor, internete ihtiyaç yok.
+An Android app that turns a photo you take (or pick from your gallery) into a Claude Monet style painting. Everything runs on the phone, no internet needed.
 
-Proje iki parçadan oluşuyor: modelin eğitildiği Python tarafı (bu klasör) ve uygulamanın kendisi (`android/`).
+The repo has two parts: the Python side where the model is trained and exported (this folder), and the app itself (`android/`).
 
-## Nasıl çalışıyor
+![Pelicans, before and after](docs/example_pelicans.jpg)
+![Forest, before and after](docs/example_forest.jpg)
 
-1. **CycleGAN:** Fotoğraf önce Monet tablolarıyla eğitilmiş bir CycleGAN'dan geçiyor. Bu adım Monet'nin renklerini ve ışığını veriyor.
-2. **Fırça darbeleri:** Çıkan görüntü boş bir tuvale gerçek fırça darbeleriyle yeniden boyanıyor (Hertzmann 1998). Önce kalın, sonra orta, en son ince fırça kullanılıyor. Darbeler görüntüdeki kenarlar boyunca kıvrılıyor.
+*Left: original photo. Right: MonetCam.*
 
-İlk denemelerde fast style transfer (Johnson vd.) kullandım. Sonuçlarda leke leke bozulmalar oluyordu ve tablo hissi vermiyordu. Bu yüzden CycleGAN'a geçtim.
+## How it works
 
-## Klasörler
+1. **CycleGAN** – the photo first goes through a CycleGAN trained on Monet paintings. This gives the colors and the light.
+2. **Brush strokes** – the result is then repainted on an empty canvas with real brush strokes (Hertzmann 1998), going from a thick brush to a thin one. Strokes curve along the edges of the image.
 
-| Dosya | Ne işe yarıyor |
+I started with fast style transfer (Johnson et al.) but it kept producing blotchy artifacts and never really looked like a painting, so I switched to CycleGAN.
+
+## Files
+
+| File | What it does |
 |---|---|
-| `cyclegan.py` | CycleGAN üreticisi (resmi koddaki ResnetGenerator) |
-| `train_cyclegan.py` | monet2photo verisiyle ince ayar (Kaggle'da çalıştırıldı) |
-| `try_cyclegan.py` | Bilgisayarda tek bir fotoğrafla deneme |
-| `paint.py` | Fırça darbeli boyamanın Python hali |
-| `export_cyclegan_gpu.py` | Modeli telefon GPU'sunda çalışacak şekilde tflite'a çevirme |
-| `export_cyclegan_segments.py` | Modeli 20 parçaya bölerek çevirme (uygulamada bu kullanılıyor) |
-| `model.py`, `losses.py`, `train.py`, `stylize.py` | Eski fast style transfer denemeleri |
-| `android/` | Android uygulaması (Kotlin, Jetpack Compose, LiteRT) |
+| `cyclegan.py` | CycleGAN generator (same ResnetGenerator as the official code) |
+| `train_cyclegan.py` | Fine-tuning on monet2photo (ran on Kaggle) |
+| `try_cyclegan.py` | Try a single photo on your computer |
+| `paint.py` | Python version of the brush stroke painter |
+| `export_cyclegan_gpu.py` | Export to tflite so it runs on the phone GPU |
+| `export_cyclegan_segments.py` | Same, but split into 20 parts (this is what the app uses) |
+| `model.py`, `losses.py`, `train.py`, `stylize.py` | Older fast style transfer experiments |
+| `android/` | The Android app (Kotlin, Jetpack Compose, LiteRT) |
 
-## Kurulum (Python)
+## Setup (Python)
 
 ```bash
 python -m venv venv
@@ -33,49 +38,49 @@ pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
 pip install -r requirements.txt
 ```
 
-Bir fotoğrafı bilgisayarda denemek için:
+To try a photo:
 
 ```bash
-python try_cyclegan.py images/foto.jpg
+python try_cyclegan.py images/photo.jpg
 ```
 
-Ağırlık dosyaları (`checkpoints/`) ve veri setleri büyük olduğu için repoda yok.
+Weights (`checkpoints/`) and datasets are not in the repo because of their size.
 
-## Eğitim
+## Training
 
-- **Veri:** Kaggle'daki monet2photo veri seti.
-- **Başlangıç ağırlıkları:** CycleGAN yazarlarının yayımladığı `style_monet` ağırlıkları.
-- **İnce ayar:** `train_cyclegan.py` bu ağırlıklardan başlayarak ince ayar yapıyor.
+- **Data:** the monet2photo dataset on Kaggle.
+- **Starting point:** the `style_monet` weights released by the CycleGAN authors.
+- **Fine-tuning:** `train_cyclegan.py` starts from those weights.
 
-Kaggle'da notebook'u **Save & Run All** ile çalıştırmak gerekiyor. Etkileşimli oturumda çıktılar kayboluyor.
+On Kaggle, run the notebook with **Save & Run All**. Outputs from an interactive session get lost.
 
-## Telefona aktarma
+## Exporting to the phone
 
 ```bash
 python export_cyclegan_segments.py
 ```
 
-Çıkan `monet_cyclegan_seg_896x672.tflite` dosyası `android/app/src/main/assets/` klasörüne gidiyor. Bu dönüşümde neyi neden değiştirdiğim:
+Copy the resulting `monet_cyclegan_seg_896x672.tflite` into `android/app/src/main/assets/`. Things I had to change along the way:
 
-- **Desteklenmeyen işlemler:** ReflectionPad, InstanceNorm ve ConvTranspose katmanları, GPU'nun desteklediği işlemlerle yeniden yazıldı.
-- **Hassasiyet:** GPU'nun yarım hassasiyetinde (fp16) değerler taşıyor ve resim bozuk çıkıyordu. Uygulama bu yüzden tam hassasiyetle (fp32) çalışıyor.
-- **Parçalara bölme:** Model tek parça halindeyken GPU'yu birkaç saniye meşgul edip ekranı donduruyordu. 20 parçaya bölünce bu düzeldi.
+- **Unsupported ops:** ReflectionPad, InstanceNorm and ConvTranspose are rewritten with ops the GPU supports.
+- **Precision:** in half precision (fp16) the values overflowed and the output came out white or black, so the app runs the GPU in fp32.
+- **Splitting:** as a single model the GPU was busy for a few seconds and the screen froze. Splitting it into 20 parts fixed that.
 
-## Android uygulaması
+## Android app
 
-`android/` klasörünü Android Studio'da açıp çalıştırman yeterli (minSdk 28).
+Open the `android/` folder in Android Studio and run it (minSdk 28).
 
-- **Giriş:** Karşılama ekranında yukarı kaydırarak uygulamaya giriliyor.
-- **Fotoğraf:** Kamerayla çekiliyor ya da galeriden seçiliyor.
-- **Sonuç:** Önce/sonra kaydırıcısıyla orijinalle karşılaştırılıyor, galeriye kaydedilebiliyor ve paylaşılabiliyor.
-- **Model hazırlığı:** Açılışta GPU, bilinen bir test deseniyle kontrol ediliyor. Test tutmazsa model CPU'da çalışıyor.
+- **Start:** swipe up on the welcome screen.
+- **Photo:** take one with the camera or pick from the gallery.
+- **Result:** compare with the original using the before/after slider, save to the gallery or share.
+- **Model check:** on startup the GPU is checked with a known test pattern. If the result doesn't match, the model runs on the CPU instead.
 
-Redmi Note 13 Pro 5G'de bir fotoğraf yaklaşık 15 saniyede işleniyor: model ~6 sn, fırça darbeleri ~8 sn.
+On a Redmi Note 13 Pro 5G a photo takes about 15 seconds: ~6 s for the model and ~8 s for the brush strokes.
 
-## Kaynaklar ve lisanslar
+## Credits and licenses
 
-- **CycleGAN:** Zhu vd., *Unpaired Image-to-Image Translation using Cycle-Consistent Adversarial Networks* (2017).
-- **Fırça darbeleri:** Hertzmann, *Painterly Rendering with Curved Brush Strokes of Multiple Sizes* (1998).
-- **Logodaki tablolar:** Monet'nin tabloları kamu malı, görseller Wikimedia Commons'tan alındı.
-- **Görseller:** Arka plan, boş tuval ve uygulama simgesi Higgsfield (Nano Banana Pro) ile üretildi.
-- **Yazı tipleri:** Abril Fatface ve Cormorant Garamond OFL, Special Elite Apache 2.0 lisanslı. Lisans metinleri `android/app/src/main/assets/licenses/` klasöründe.
+- **CycleGAN:** Zhu et al., *Unpaired Image-to-Image Translation using Cycle-Consistent Adversarial Networks* (2017).
+- **Brush strokes:** Hertzmann, *Painterly Rendering with Curved Brush Strokes of Multiple Sizes* (1998).
+- **Paintings in the logo:** Monet's paintings are in the public domain, images taken from Wikimedia Commons.
+- **App images:** the background, empty canvas and app icon were generated with Higgsfield (Nano Banana Pro).
+- **Fonts:** Abril Fatface and Cormorant Garamond are under the OFL, Special Elite under Apache 2.0. License texts are in `android/app/src/main/assets/licenses/`.
