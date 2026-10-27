@@ -120,6 +120,10 @@ python export_cyclegan_segments.py        # writes monet_cyclegan_seg_896x672.tf
 
 The app already ships with the exported model, so to just run it open `android/` in Android Studio and hit Run (minSdk 28). After re-exporting, copy the new `.tflite` into `android/app/src/main/assets/`. Run all scripts from the repo root. The fine-tuned weights are included; the training data (monet2photo) is not.
 
+## License
+
+The code and the fine-tuned weights are released under the [MIT License](LICENSE). Third-party parts listed below (fonts, Monet paintings, generated app images, the original CycleGAN weights) keep their own licenses and terms.
+
 ## Credits
 
 - **CycleGAN:** Zhu, Park, Isola, Efros. *Unpaired Image-to-Image Translation using Cycle-Consistent Adversarial Networks*, ICCV 2017. Pretrained `style_monet` weights from the official repo.
